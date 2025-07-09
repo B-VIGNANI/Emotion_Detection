@@ -1,0 +1,233 @@
+Language used:
+Python
+Software used:
+Jupyter Notebook(.ipnyb)
+Libraries used:
+OS, Glob, Librosa, Numpy, Sklearn, Tensorflow, Keras, Pydub, Tkinter, Sounddevice, PIL 
+
+
+
+## speeh emotion recognition app (final)
+import os
+import csv
+import tkinter as tk
+from tkinter import filedialog, messagebox
+from PIL import ImageTk, Image
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+import numpy as np
+import sounddevice as sd
+import scipy.io.wavfile as wav
+import tempfile
+
+# Dummy emotion prediction function — replace with your actual model
+def predict_emotion(audio_path):
+    emotions = ['HAPPY', 'SAD', 'ANGRY', 'SURPRISED', 'NEUTRAL', 'FEAR', 'DISGUST']
+    probabilities = np.random.dirichlet(np.ones(len(emotions)), size=1).flatten()
+    predicted_index = np.argmax(probabilities)
+    return emotions[predicted_index], dict(zip(emotions, probabilities))
+
+class EmotionApp:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("Speech Emotion Recognition")
+        self.root.geometry("1000x600")
+        self.dark_mode = False
+
+        self.base_emoji_path = r"C:\\Users\\moham\\Downloads\\Emotion_Recognition_Project\\Speech_Emotion_Recognition\\Emotion Emojis\\Emoji"
+        self.logo_path = r"C:\\Users\\moham\\Downloads\\Emotion_Recognition_Project\\Speech_Emotion_Recognition\\images\\logo.png"
+        self.emotion_to_emoji = {
+            "HAPPY": os.path.join(self.base_emoji_path, "happy.gif"),
+            "SAD": os.path.join(self.base_emoji_path, "sad.gif"),
+            "ANGRY": os.path.join(self.base_emoji_path, "angry.gif"),
+            "SURPRISED": os.path.join(self.base_emoji_path, "surprised.gif"),
+            "NEUTRAL": os.path.join(self.base_emoji_path, "neutral.gif"),
+            "FEAR": os.path.join(self.base_emoji_path, "fear.gif"),
+            "DISGUST": os.path.join(self.base_emoji_path, "disgust.gif")
+        }
+
+        self.emoji_label = None
+        self.emoji_image = None
+        self.prediction_history = []
+
+        self.create_menu()
+        self.show_home_page()
+
+    def create_menu(self):
+        self.menubar = tk.Menu(self.root)
+        app_menu = tk.Menu(self.menubar, tearoff=0)
+        app_menu.add_command(label="User Manual", command=self.show_user_manual)
+        app_menu.add_command(label="Toggle Dark Mode", command=self.toggle_dark_mode)
+        app_menu.add_command(label="About the App", command=self.show_about_page)
+        self.menubar.add_cascade(label="Menu", menu=app_menu)
+        self.root.config(menu=self.menubar)
+
+    def clear_window(self):
+        for widget in self.root.winfo_children():
+            if not isinstance(widget, tk.Menu):
+                widget.destroy()
+
+    def apply_theme(self):
+        bg = '#1e1e1e' if self.dark_mode else 'white'
+        fg = 'white' if self.dark_mode else 'black'
+        self.root.configure(bg=bg)
+        return bg, fg
+
+    def back_button(self, command):
+        tk.Button(self.root, text="\u2190 Back", command=command, bg='lightgrey').place(x=10, y=10)
+
+    def show_home_page(self):
+        self.clear_window()
+        bg, fg = self.apply_theme()
+
+        left_frame = tk.Frame(self.root, bg=bg)
+        left_frame.pack(side='left', fill='both', expand=True)
+        right_frame = tk.Frame(self.root, bg=bg)
+        right_frame.pack(side='right', fill='both', expand=True)
+
+        tk.Label(left_frame, text="\U0001F3A7 Speech Emotion Recognition", font=('Helvetica bold', 18), bg=bg, fg=fg).pack(pady=40)
+
+        tk.Button(left_frame, text="\U0001F399\ufe0f Record Audio", command=self.record_audio_page, bg='orange').pack(pady=10)
+        tk.Button(left_frame, text="\U0001F4C1 Upload Audio", command=self.upload_audio_page, bg='lightgreen').pack(pady=10)
+        tk.Button(left_frame, text="\U0001F4DC Prediction History", command=self.show_history_page, bg='lightblue').pack(pady=10)
+        tk.Button(left_frame, text="\u274C Exit", command=self.confirm_exit, bg='red', fg='white').pack(pady=10)
+
+        if os.path.exists(self.logo_path):
+            logo_image = Image.open(self.logo_path)
+            logo_image = logo_image.resize((400, 550), Image.Resampling.LANCZOS)
+            logo_tk = ImageTk.PhotoImage(logo_image)
+            logo_label = tk.Label(right_frame, image=logo_tk, bg=bg)
+            logo_label.image = logo_tk
+            logo_label.pack()
+
+    def confirm_exit(self):
+        if messagebox.askokcancel("Exit", "Do you really want to exit?"):
+            self.root.destroy()
+
+    def toggle_dark_mode(self):
+        self.dark_mode = not self.dark_mode
+        self.show_home_page()
+
+    def show_user_manual(self):
+        self.clear_window()
+        self.back_button(self.show_home_page)
+        bg, fg = self.apply_theme()
+        manual = (
+            "\U0001F4D8 USER MANUAL\n\n"
+            "1. \U0001F399\ufe0f Click 'Record Audio' to use your microphone.\n"
+            "2. \U0001F4C1 Click 'Upload Audio' to select a .wav file.\n"
+            "3. After prediction, you'll see:\n"
+            "   - Emotion name\n"
+            "   - Emoji animation\n"
+            "   - Emotion probability chart\n"
+            "4. Check 'Prediction History' for past results.\n"
+            "5. Only '.wav' files are supported."
+        )
+        tk.Label(self.root, text=manual, justify="left", font=('Arial', 12), wraplength=550, bg=bg, fg=fg).pack(padx=20, pady=30)
+
+    def show_about_page(self):
+        self.clear_window()
+        self.back_button(self.show_home_page)
+        bg, fg = self.apply_theme()
+        about = (
+            "\u2139\ufe0f ABOUT THE APP\n\n"
+            "\U0001F539 FEATURES:\n"
+            "- Record or upload audio\n"
+            "- Predict emotion from speech\n"
+            "- Animated emoji output\n"
+            "- Bar chart of prediction confidence\n"
+            "- Export results as CSV\n"
+            "- Dark mode UI\n\n"
+            "\U0001F539 APPLICATIONS:\n"
+            "- AI Assistants\n"
+            "- Customer Service\n"
+            "- Mental Health Monitoring\n"
+            "- Learning & Research\n\n"
+            "\U0001F539 CREDITS:\n"
+            "- Dataset: TESS (University of Toronto)\n"
+            "- Developed using Python + Tkinter"
+        )
+        tk.Label(self.root, text=about, justify="left", font=('Arial', 12), wraplength=550, bg=bg, fg=fg).pack(padx=20, pady=30)
+
+    def show_history_page(self):
+        self.clear_window()
+        self.back_button(self.show_home_page)
+        bg, fg = self.apply_theme()
+        tk.Label(self.root, text="\U0001F4DC Prediction History", font=('Helvetica bold', 16), bg=bg, fg=fg).pack(pady=20)
+        if self.prediction_history:
+            for i, (file_name, emotion) in enumerate(self.prediction_history[::-1], start=1):
+                tk.Label(self.root, text=f"{i}. {file_name} — Emotion: {emotion}", bg=bg, fg=fg).pack(anchor='w', padx=20)
+            tk.Button(self.root, text="\U0001F4BE Export as CSV", command=self.export_csv, bg='orange').pack(pady=10)
+        else:
+            tk.Label(self.root, text="No history yet.", bg=bg, fg=fg).pack()
+
+    def export_csv(self):
+        file_path = filedialog.asksaveasfilename(defaultextension=".csv", filetypes=[("CSV files", "*.csv")])
+        if file_path:
+            with open(file_path, mode='w', newline='') as file:
+                writer = csv.writer(file)
+                writer.writerow(["File Name", "Predicted Emotion"])
+                writer.writerows(self.prediction_history)
+            messagebox.showinfo("Success", "History exported successfully!")
+
+    def upload_audio_page(self):
+        self.clear_window()
+        self.back_button(self.show_home_page)
+        bg, fg = self.apply_theme()
+        def choose_file():
+            file_path = filedialog.askopenfilename(filetypes=[("WAV Audio", "*.wav")])
+            if file_path:
+                self.display_result(file_path, os.path.basename(file_path))
+        tk.Label(self.root, text="\U0001F4C1 Upload a WAV File", font=('Helvetica bold', 16), bg=bg, fg=fg).pack(pady=40)
+        tk.Button(self.root, text="Upload Audio", command=choose_file, bg='orange').pack(pady=10)
+
+    def record_audio_page(self):
+        self.clear_window()
+        self.back_button(self.show_home_page)
+        bg, fg = self.apply_theme()
+        def record_and_predict():
+            duration = 4
+            fs = 44100
+            tk.Label(self.root, text="Recording...", fg="red", bg=bg).pack()
+            recording = sd.rec(int(duration * fs), samplerate=fs, channels=1)
+            sd.wait()
+            with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as temp_file:
+                wav.write(temp_file.name, fs, recording)
+                self.display_result(temp_file.name, "Recorded_Audio.wav")
+        tk.Label(self.root, text="\U0001F399\ufe0f Record Your Voice", font=('Helvetica bold', 16), bg=bg, fg=fg).pack(pady=40)
+        tk.Button(self.root, text="Start Recording", command=record_and_predict, bg='orange').pack(pady=10)
+
+    def display_result(self, file_path, file_name):
+        self.clear_window()
+        self.back_button(self.show_home_page)
+        bg, fg = self.apply_theme()
+        predicted_emotion, probabilities = predict_emotion(file_path)
+        self.prediction_history.append((file_name, predicted_emotion))
+        tk.Label(self.root, text="Predicted Emotion:", font=('Helvetica bold', 16), bg=bg, fg=fg).pack(pady=10)
+        tk.Label(self.root, text=predicted_emotion, font=('Helvetica bold', 20), fg='blue', bg=bg).pack()
+        emoji_path = self.emotion_to_emoji.get(predicted_emotion)
+        if emoji_path and os.path.exists(emoji_path):
+            self.emoji_image = tk.PhotoImage(file=emoji_path)
+            factor = max(1, int(self.emoji_image.width() / 240))
+            resized = self.emoji_image.subsample(factor)
+            self.emoji_label = tk.Label(self.root, image=resized, bg=bg)
+            self.emoji_label.image = resized
+            self.emoji_label.pack(pady=10)
+        self.show_emotion_bar_chart(probabilities)
+
+    def show_emotion_bar_chart(self, probabilities):
+        fig, ax = plt.subplots(figsize=(6, 3), dpi=100)
+        emotions = list(probabilities.keys())
+        probs = list(probabilities.values())
+        ax.bar(emotions, probs, color='skyblue')
+        ax.set_title('Emotion Probabilities')
+        ax.set_ylim(0, 1)
+        ax.set_ylabel('Probability')
+        canvas = FigureCanvasTkAgg(fig, master=self.root)
+        canvas.draw()
+        canvas.get_tk_widget().pack(pady=10)
+
+if __name__ == "__main__":
+    root = tk.Tk()
+    app = EmotionApp(root)
+    root.mainloop()
